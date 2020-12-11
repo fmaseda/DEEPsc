@@ -6,7 +6,7 @@
 
 ## Quick start: Test on follicle data
 
-Since the murine follicle system has the smallest reference atlas with $G=8$ genes and thus takes the least amount of time to train, we have included a plug-and-play test for this system in the `/tests` folder. To run this test, simply navigate to the DEEPsc folder in MATLAB and run `TestFollicle` from the command window.
+Since the murine follicle system has the smallest reference atlas with *G=8* genes and thus takes the least amount of time to train, we have included a plug-and-play test for this system in the `/tests` folder. To run this test, simply navigate to the DEEPsc folder in MATLAB and run `TestFollicle` from the command window.
 
 The following procedures can be followed for other systems or to better understand this test case:
 
@@ -16,7 +16,7 @@ The following procedures can be followed for other systems or to better understa
 
 ### Spatial reference atlases
 
-A spatial reference atlas is stored as a $P\times G$ array, where $P$ is the number of spatial positions in the atlas, and $G$ is the number of genes for which there is known spatial expression. Each row contains the expression levels of each of the $G$ genes.
+A spatial reference atlas is stored as a *P x G* array, where *P* is the number of spatial positions in the atlas, and *G* is the number of genes for which there is known spatial expression. Each row contains the expression levels of each of the *G* genes.
 
 The `/atlas` subfolder includes several `.mat` files which contain the matrices used for each of the three biological systems under study: the zebrafish embryo ([Satija et al., 2015](https://www.nature.com/articles/nbt.3192)), the Drosophila embryo ([Karaiskos et al., 2017](https://science.sciencemag.org/content/358/6360/194)), and the murine hair follicle ([Joost et al., 2016](https://www.cell.com/fulltext/S2405-4712(16)30265-4)). To load the data, simply navigate to the `/atlas` subfolder in the MATLAB "Current Folder" selector and double click to load each `.mat` file. Alternatively, run the following from the MATLAB Command Window:
 
@@ -27,7 +27,7 @@ where `SYSTEM` is replaced by either `Follicle`, `Drosophila`, or `Zebrafish`. F
 
 ### scRNA-seq datasets
 
-A scRNA-seq dataset is stored as a $C\times G$ array, where $C$ is the number of cells in the dataset, each row corresponding to a single cell. The preprocessed arrays for each of the three biological systems are included in `.mat` files in the `/scRNAseq` subfolder and can be loaded in the same way as the spatial reference atlases above. Each system has a continuous and a binarized version of scRNA-seq data, clearly labelled, e.g. `SCD_DrosophilaBinary`. The full, non-binarized scRNA-seq datasets (including genes for which no spatial information exists) for each system are stored in arrays such as `FullSCD_Drosophila`.
+A scRNA-seq dataset is stored as a *C x G* array, where *C* is the number of cells in the dataset, each row corresponding to a single cell. The preprocessed arrays for each of the three biological systems are included in `.mat` files in the `/scRNAseq` subfolder and can be loaded in the same way as the spatial reference atlases above. Each system has a continuous and a binarized version of scRNA-seq data, clearly labelled, e.g. `SCD_DrosophilaBinary`. The full, non-binarized scRNA-seq datasets (including genes for which no spatial information exists) for each system are stored in arrays such as `FullSCD_Drosophila`.
 
 ## Training a DEEPsc network
 
@@ -51,7 +51,7 @@ where `method` can be one of several strings (e.g. `'Seurat'`, `'DistMap'`, `'DE
 ```
 Corr = RunMatchingAlgorithms('deepsc',MyAtlas,SCD,'NN',DEEPscNet,'doPCA',true)
 ```
-The output `Corr` is a $C\times P$ array where `Corr(i,j)` contains the likelihood that cell `i` in the scRNA-seq dataset originated from point `j` in the spatial reference atlas.
+The output `Corr` is a *C x P* array where `Corr(i,j)` contains the likelihood that cell `i` in the scRNA-seq dataset originated from point `j` in the spatial reference atlas.
 
 ## Quantifying spatial mapping performance
 
@@ -66,7 +66,7 @@ where `method` and `MyAtlas` are defined in the previous section. The output `ac
 
 ## Displaying inferred spatial origins
 
-This software package outputs from `RunMatchingAlgorithms()` a $C\times P$ array of the likelihood a given method assigns each cell as having originated from each position. Thus, we can visualize rows of this array as a heatmap over a standard diagram of the system under study. To do this, call
+This software package outputs from `RunMatchingAlgorithms()` a *C x P* array of the likelihood a given method assigns each cell as having originated from each position. Thus, we can visualize rows of this array as a heatmap over a standard diagram of the system under study. To do this, call
 ```
 DisplayMatchResults(system,MyCorr,cellNum)
 ```
