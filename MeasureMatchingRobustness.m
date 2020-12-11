@@ -1,45 +1,127 @@
-function [robustness,performance,accuracyArray,precisionArray]=MeasureMatchingRobustness(Atlas,SCD,method,knownOrigin,normMat,NN,showplot,numIter,Patches,doPCA)
+function varargout=MeasureMatchingRobustness(method,Atlas,varargin)
+%% Determines performance score of method on Atlas
+%
+% Inputs
+%   method:             string
+%                       -'binary','achim': (Achim, 2015)
+%                       -'satija','seurat': (Satija, 2015)
+%                       -'karaiskos','matthews','mcc','distmap': (Karaiskos, 2017)
+%                       -'peng','spearman','rcc': (Peng, 2016)
+%                       -'infnorm','inf-norm','inf': Baseline
+%                       -'2norm','2-norm','2','euclidean': Baseline
+%                       -'percent','percentdiff','percentdifference','%diff','%diff','%': Baseline
+%                       -'convolution-2norm','convolution-2','convolution-euclidean':
+%                           2-norm baseline but convolved with spatial atlas,
+%                           requires Patches to be supplied
+%                       -'convolution-infnorm','convolution-inf': inf-norm 
+%                           baseline but convolved with spatial atlas,
+%                           requires Patches to be supplied
+%                       -'weighted','weightednorm','matrixnorm','norm','lmnn':
+%                           baseline weighted norm, requires normMat to be
+%                           supplied
+%                       -'neuralnet','ann','nn','deepsc': DEEPsc method,
+%                           requires NN to be supplied
+%                       -'siamese','siamesenn','siam','snn': Siamese neural
+%                           network method, requies NN to be of format
+%                           {mainNN, FClayer}
+%   Atlas:              PxG array of gene expression data, where P is the number
+%                       of atlas positions and G is the number of genes in the
+%                       atlas                          
+%
+% Optional inputs
+%   numSteps:           integer, number of steps between 0 and 1 to add
+%                       noise at (default=20)
+%   numRunsEachStep:    integrer, number of runs to perform for each value
+%                       of random noise added (default=10)
+%   doPCA:              boolean, whether or not to perform PCA on Atlas/SCD
+%                       before mapping (default=false)
+%   PCAdims:            integer, number of PCA components to keep (default=8)
+%   showPlot:           boolean, whether or not to show the statisticts
+%                       in a new figure (default=true)
+%   normMat:            if method='weighted', this is the matrix of the
+%                       weighted norm
+%   NN:                 if method='deepsc', this is the trained DEEPsc
+%                       network from TrainMatchingNNAsMetric()
+%   numIter:            if method='seurat', this is the number of
+%                       iterations to refine GMM modelling (default=1)
+%   Patches:            if method requires convolution of the reference
+%                       atlas, this contains the patches defined by the
+%                       atlas
+%
+% Outputs
+%   If nargout=1,       robustness
+%   If nargout=2,       [robustness, performance]
+%   If nargout=4,       [accuracy, precision, robustness, performance]
+%   If nargout=6,       [accuracy, precision, robustness, performance, accArray, precArray]
+%
+% ----------
+% Example usage
+%   rob = MeasureMatchingRobustness('2norm',MyAtlas)
+%   [rob,perf] = MeasureMatchingRobustness('deepsc',MyAtlas,'NN',DEEPscNet,'doPCA',true)
+%   [acc,prec,rob,perf] = MeasureMatchingRobustness('lmnn',MyAtlas,'normMat',LMNN)
+%   [acc,prec,rob,perf,accArray,precArray] = MeasureMatchingRobustness('inf',MyAtlas)
 
+%% parse input arguments
+for k = 1:2:length(varargin)
+    switch lower(varargin{k})
+        case 'normmat'
+            normMat = varargin{k+1};
+        case 'nn'
+            NN = varargin{k+1};
+        case 'numiter'
+            numIter = varargin{k+1};
+        case 'patches'
+            Patches = varargin{k+1};
+        case 'dopca'
+            doPCA = varargin{k+1};
+        case 'pcadims'
+            PCAdims = varargin{k+1};
+        case 'showplot'
+            showPlot = varargin{k+1};
+        case 'numsteps'
+            numSteps = varargin{k+1};
+        case 'numrunseachstep'
+            numRunsEachStep = varargin{k+1};
+    end
+end
+
+%% default values
 P=size(Atlas,1);    % numberPositions
 G=size(Atlas,2);    % numberGenes
 
-% default input values
-if nargin<4
-    knownOrigin=true;   % default to assuming labelled data
+if ~exist('numSteps','var') || isempty(numSteps)
+    numSteps=20;
 end
-if nargin<5
+if ~exist('numRunsEachStep','var') || isempty(numRunsEachStep)
+    numRunsEachStep=10;
+end
+if ~exist('normMat','var') || isempty(normMat)
     normMat=eye(G);     % if method='weighted', default to identity matrix
 end
-if nargin<6
-    NN=1;               % will cause error if method='ann' and no NN supplied
+if ~exist('NN','var') || isempty(NN)
+    NN=1;               % will cause error if method='deepsc' and no NN supplied
 end
-if nargin<7
-    showplot=true;      % show plot by default
+if ~exist('showPlot','var') || isempty(showPlot)
+    showPlot=true;      % show plot by default
 end
-if nargin<8
+if ~exist('numIter','var') || isempty(numIter)
     numIter = 1;
 end
-if nargin<9
-    Patches={};
+if ~exist('Patches','var') || isempty(Patches)
+    Patches={};         % will cause an error if method requires it
 end
-if nargin<10
+if ~exist('doPCA','var') || isempty(doPCA)
     doPCA=false;
 end
-
-% calculate accuracy and precision with no noise
-if knownOrigin
-    assert(all(Atlas==SCD,'all'),'Assuming known spatial origin but SCD does not match Atlas');
-    Corr=RunMatchingAlgorithms(Atlas,SCD,method,normMat,NN,numIter,Patches,doPCA);
-    [accuracy,precision]=CorrErrorKnownResult(Corr)
-else
-%     SCD=NormalizeRNAseq(SCD,'linear');  % normalize SCD to be in [0,1]
-    Corr=RunMatchingAlgorithmsDropout(Atlas,SCD,method,normMat,NN,numIter,Patches,doPCA);
-    [accuracy,precision]=CorrErrorUnknownResult(Corr,Atlas,SCD)
+if ~exist('PCAdims','var') || isempty(PCAdims)
+    PCAdims=8;
 end
 
-% configure parameters
-numSteps=20;
-numRunsEachStep=10;
+%% begin calculation
+% calculate accuracy and precision with no noise
+Corr=RunMatchingAlgorithms(method,Atlas,Atlas,'normMat',normMat,'NN',NN, ...
+        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+[accuracy,precision]=CorrErrorKnownResult(Corr);
 
 % calculate accuracy and precision for various levels of gaussian noise in
 % the atlas
@@ -50,15 +132,11 @@ precisionArray(:,1)=precision;
 tic
 parfor i=1:numSteps
     for j=1:numRunsEachStep
-        fprintf('i=%d, j=%d\n',i,j)
-        NoisySCD=AddNoise(SCD,i/numSteps,0,1);
-        if knownOrigin
-            NoisyCorr=RunMatchingAlgorithms(Atlas,NoisySCD,method,normMat,NN,numIter,Patches,doPCA);
-            [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
-        else
-            NoisyCorr=RunMatchingAlgorithmsDropout(Atlas,NoisySCD,method,normMat,NN,numIter,Patches,doPCA);
-            [accuracy,precision]=CorrErrorUnknownResult(NoisyCorr,Atlas,SCD);
-        end
+%         fprintf('i=%d, j=%d\n',i,j)
+        NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
+        NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
+                    'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims)
+        [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
         accuracyArray(j,i+1)=accuracy;
         precisionArray(j,i+1)=precision;
     end
@@ -71,7 +149,7 @@ da=std(accuracyArray); dp=std(precisionArray);
 e=1/2*(a+p);
 de=sqrt(da.^2+dp.^2);
 
-if showplot
+if showPlot
     % plot results
     % ----------
     x=((1:numSteps+1)-1)./numSteps;
@@ -97,11 +175,7 @@ if showplot
     ylim([0 1])
     set(gca,'fontsize',14)
 
-    if knownOrigin
-        sgtitle(['Robustness of method ''' method ''' for labelled data'])
-    else
-        sgtitle(['Robustness of method ''' method ''' for unlabelled data'])
-    end
+    sgtitle(['Robustness of method ''' method ''''])
 end
 
 % now calculate robustness
@@ -118,7 +192,7 @@ else
     r = 1 - r/(numSteps*(e(i)-e(i-1)));
 end
 
-if showplot
+if showPlot
     % and plot robustness on performance score plot
     hold on
     plot(x,theory*ones(size(x)),'b:')
@@ -128,8 +202,10 @@ end
 
 robustness = r^4;
 performance=1-(a(1)+p(1)+robustness)/3;
+accuracy=a(1);
+precision=p(1);
 
-if showplot
+if showPlot
     % display analytics
     txt=sprintf(['Accuracy: %9.4f\n\nPrecision: %8.4f\n\nRobustness:' ...
         ' %7.4f\n\nPerformance: %6.4f'],[a(1) p(1) robustness performance]);
@@ -137,5 +213,17 @@ if showplot
     uicontrol(pan,'Style','text','Units', 'norm','Position',[0.15 -0.15 1 1],...
         'HorizontalAlignment','Left','FontSize',16,'FontName','FixedWidth', ...
         'FontWeight','Bold','String',txt)
-    round((a(1)+p(1))/2,4)
+%     round((a(1)+p(1))/2,4)
+end
+
+if nargout==0||nargout==1
+    varargout={robustness};
+elseif nargout==2
+    varargout={robustness,performance};
+elseif nargout==4
+    varargout={accuracy,precision,robustness,performance};
+elseif nargout==6
+    varargout={accuracy,precision,robustness,performance,accuracyArray,precisionArray};
+end
+
 end

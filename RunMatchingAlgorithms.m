@@ -1,37 +1,99 @@
-function [Corr,confidence]=RunMatchingAlgorithms(Atlas,SCD,method,normMat,NN,numIter,Patches,doPCA)
-% - Atlas input is numberLocations (P) x numberGenes (G) logical matrix
-% - SCD input is numberCells (C) x numberGenes (G) double matrix
-% - method input is string defining which matching algorithm to use
-% - normMat is a GxG matrix required if using weighted norm method
-% - NN is a SeriesNetwork object from the deep learning toolbox that can be
-%   evaluated as a metric if method=='neuralnet'
-% - numIter is an integer defining how many iterations an iterative method
-%   (e.g. Satija's) should run
-% - Patches describes shapes in atlas for methods that use spatial
-%   information ("convolution", ...)
+function Corr=RunMatchingAlgorithms(method,Atlas,SCD,varargin)
+%% Runs the specified mapping method to map SCD to Atlas, outputting correspondence
+%  scores for each pair
+%
+% Inputs
+%   method:             string
+%                       -'binary','achim': (Achim, 2015)
+%                       -'satija','seurat': (Satija, 2015)
+%                       -'karaiskos','matthews','mcc','distmap': (Karaiskos, 2017)
+%                       -'peng','spearman','rcc': (Peng, 2016)
+%                       -'infnorm','inf-norm','inf': Baseline
+%                       -'2norm','2-norm','2','euclidean': Baseline
+%                       -'percent','percentdiff','percentdifference','%diff','%diff','%': Baseline
+%                       -'convolution-2norm','convolution-2','convolution-euclidean':
+%                           2-norm baseline but convolved with spatial atlas,
+%                           requires Patches to be supplied
+%                       -'convolution-infnorm','convolution-inf': inf-norm 
+%                           baseline but convolved with spatial atlas,
+%                           requires Patches to be supplied
+%                       -'weighted','weightednorm','matrixnorm','norm','lmnn':
+%                           baseline weighted norm, requires normMat to be
+%                           supplied
+%                       -'neuralnet','ann','nn','deepsc': DEEPsc method,
+%                           requires NN to be supplied
+%                       -'siamese','siamesenn','siam','snn': Siamese neural
+%                           network method, requies NN to be of format
+%                           {mainNN, FClayer}
+%   Atlas:              PxG array of gene expression data, where P is the number
+%                       of atlas positions and G is the number of genes in the
+%                       atlas
+%   SCD:                CxG array of expression data, where C is the number
+%                       of single cells, and G is the number of genes in
+%                       the spatial reference atlas (indices should match
+%                       Atlas)                           
+%                       
+%
+% Optional inputs
+%   normMat:            if method='weighted', this is the matrix of the
+%                       weighted norm
+%   NN:                 if method='deepsc', this is the trained DEEPsc
+%                       network from TrainMatchingNNAsMetric()
+%   numIter:            if method='seurat', this is the number of
+%                       iterations to refine GMM modelling (default=1)
+%   Patches:            if method requires convolution of the reference
+%                       atlas, this contains the patches defined by the
+%                       atlas
+%   doPCA:              boolean, whether or not to perform PCA on Atlas/SCD
+%                       before mapping (default=false)
+%   PCAdims:            integer, number of PCA components to keep (default=8)
+%
+%
+% Outputs
+%   Corr:               CxP array with elements giving correspondence score
+%                       for each cell-position pair
+%
 % ----------
-% Corr output is numberCells (C) x numberLocations (P) matrix with "score"
-% of how likely each cell in SCD is to have come from each location in Atlas
+% Example usage
+%   Corr = RunMatchingAlgorithms('deepsc',MyAtlas,SCD,'NN',DEEPscNet,'doPCA',true)
 
-% set variables for use in all methods
+%% parse input arguments
+for k = 1:2:length(varargin)
+    switch lower(varargin{k})
+        case 'normmat'
+            normMat = varargin{k+1};
+        case 'nn'
+            NN = varargin{k+1};
+        case 'numiter'
+            numIter = varargin{k+1};
+        case 'patches'
+            Patches = varargin{k+1};
+        case 'dopca'
+            doPCA = varargin{k+1};
+        case 'pcadims'
+            PCAdims = varargin{k+1};
+    end
+end
+
+%% set defaults
+if ~exist('numIter','var') || isempty(numIter)
+    numIter = 1;
+end
+if ~exist('doPCA','var') || isempty(doPCA)
+    doPCA = false;
+end
+if ~exist('PCAdims','var') || isempty(PCAdims)
+    PCAdims = 8;
+end
+
+%% setup
 C=size(SCD,1);      % numberCells
 P=size(Atlas,1);    % numberPositions
 G=size(Atlas,2);    % numberGenes
 
-% default input values
-if nargin<4
-    normMat=eye(G);
-end
-if nargin<6
-    numIter=1;
-end
-if nargin<8
-    doPCA=false;
-end
-
 if doPCA
-    if G>8
-        G=8;
+    if G>PCAdims
+        G=PCAdims;
     end
     [PCA_coefs,Atlas]=pca(Atlas*1);
     Atlas=Atlas(:,1:G);
@@ -44,6 +106,8 @@ if doPCA
     SCD=NormalizeRNAseq(SCD,'linear');
 end
 
+
+%% run method
 Corr=zeros(C,P);
 
 switch lower(method)
@@ -384,19 +448,12 @@ switch lower(method)
     
 end
 
-% ------------------------------------------------------------
-% Post-processing common to all methods (except ANN)
-% ------------------------------------------------------------
+%% post-processing
 
 if ~any(strcmpi({'neuralnet','ann','nn','siamese','siamesenn','siam','snn'},method))
-    % scale output to [0,1]
-%     Corr=Corr-min(Corr,[],'all');
     Corr=Corr-min(Corr,[],2);
-    confidence=sum(Corr,2);     % total sum for each cell functions as
-                                % confidence of mapping
-%     Corr=Corr./(max(Corr,[],'all')+eps());
     Corr=Corr./(max(Corr,[],2)+eps());  % divide each heatmap by maximum to make at
-                                % least one position equal one for every cell
+                                        % least one position equal one for every cell
 end
 
 end
