@@ -31,7 +31,7 @@ function varargout=MeasureMatchingRobustness(method,Atlas,varargin)
 % Optional inputs
 %   numSteps:           integer, number of steps between 0 and 1 to add
 %                       noise at (default=20)
-%   numRunsEachStep:    integrer, number of runs to perform for each value
+%   numRunsEachStep:    integer, number of runs to perform for each value
 %                       of random noise added (default=10)
 %   doPCA:              boolean, whether or not to perform PCA on Atlas/SCD
 %                       before mapping (default=false)
@@ -47,6 +47,8 @@ function varargout=MeasureMatchingRobustness(method,Atlas,varargin)
 %   Patches:            if method requires convolution of the reference
 %                       atlas, this contains the patches defined by the
 %                       atlas
+%   useParallel:        boolean, whether or not to do calculations in
+%                       parallel (default=true)
 %
 % Outputs
 %   If nargout=1,       robustness
@@ -82,6 +84,8 @@ for k = 1:2:length(varargin)
             numSteps = varargin{k+1};
         case 'numrunseachstep'
             numRunsEachStep = varargin{k+1};
+        case 'useparallel'
+            useParallel = varargin{k+1};
     end
 end
 
@@ -116,6 +120,9 @@ end
 if ~exist('PCAdims','var') || isempty(PCAdims)
     PCAdims=8;
 end
+if ~exist('useParallel','var') || isempty(useParallel)
+    useParallel=true;
+end
 
 %% begin calculation
 % calculate accuracy and precision with no noise
@@ -125,23 +132,46 @@ Corr=RunMatchingAlgorithms(method,Atlas,Atlas,'normMat',normMat,'NN',NN, ...
 
 % calculate accuracy and precision for various levels of gaussian noise in
 % the atlas
-accuracyArray=zeros(numRunsEachStep,numSteps+1);    % +1 because of no noise step
-precisionArray=zeros(numRunsEachStep,numSteps+1);
+accuracyArray=NaN(numRunsEachStep,numSteps+1);    % +1 because of no noise step
+precisionArray=NaN(numRunsEachStep,numSteps+1);
 accuracyArray(:,1)=accuracy;
 precisionArray(:,1)=precision;
 tic
-parfor i=1:numSteps
-    for j=1:numRunsEachStep
-%         fprintf('i=%d, j=%d\n',i,j)
-        NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
-        NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
-                    'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims)
-        [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
-        accuracyArray(j,i+1)=accuracy;
-        precisionArray(j,i+1)=precision;
+if useParallel
+    parfor i=1:numSteps
+        for j=1:numRunsEachStep
+    %         fprintf('i=%d, j=%d\n',i,j)
+            NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
+            NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
+                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+            [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
+            accuracyArray(j,i+1)=accuracy;
+            precisionArray(j,i+1)=precision;
+        end
+    end
+else
+    e=1/2*(accuracy+precision);
+    theory=e+.1;
+    i=1;
+    while i<=numSteps && e<theory
+        v1=accuracyArray(:,i+1);
+        v2=precisionArray(:,i+1);
+        for j=1:numRunsEachStep
+    %         fprintf('i=%d, j=%d\n',i,j)
+            NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
+            NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
+                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+            [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
+            v1(j)=accuracy;
+            v2(j)=precision;
+        end
+        accuracyArray(:,i+1)=v1;
+        precisionArray(:,i+1)=v2;
+        e=1/2*mean(v1+v2);
+        i=i+1;
     end
 end
-toc
+toc % show time elapsed
 
 % accuracy, precision, total error
 a=mean(accuracyArray); p=mean(precisionArray);
@@ -157,14 +187,14 @@ if showPlot
     subplot(2,2,1)
     errorbar(x,a,da,'go','MarkerSize',3)
     title('Accuracy Error')
-    ylim([0 1])
+    axis([0 1 0 1])
     set(gca,'fontsize',14)
 
     % precision error
     subplot(2,2,2)
     errorbar(x,p,dp,'ro','MarkerSize',3)
     title('Precision Error')
-    ylim([0 1])
+    axis([0 1 0 1])
     set(gca,'fontsize',14)
 
     % performance
@@ -172,7 +202,7 @@ if showPlot
     errorbar(x,e,de,'b-')
     title('Total error/Robustness')
     xlabel('Level of Gaussian Noise')
-    ylim([0 1])
+    axis([0 1 0 1])
     set(gca,'fontsize',14)
 
     sgtitle(['Robustness of method ''' method ''''])

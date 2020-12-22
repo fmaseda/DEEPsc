@@ -6,12 +6,16 @@ function DisplayMatchResults(system,Corr,cellnum,varargin)
 %                   -'follicle','mouse','hair': Follicle system
 %                   -'zebrafish','satija','seurat': Zebrafish system
 %                   -'drosophila','fly','distmap': Drosophila system
+%                   -'brain','mousebrain','visiumbrain', ...
+%                    'cortex','mousecortex','visiumcortex', ...
+%                    'brainpost','mousebrainpost','visiumpost', ...
+%                    'brainant','mousebrainant','visiumant': Mouse cortex system
 %   Corr:           CxP array of correspondence scores from RunMatchingMethods()
 %   cellnum:        integer, which cell to display heatmap for (row of Corr)
 %
 % Required Name-Value pairs:
 %   If system='follicle' or 'zebrafish', require Patches and Vertices
-%   If system='drosophila', require Centers
+%   If system='drosophila'or 'cortex', require Centers
 %
 % Optional inputs
 %   figNum:         integer, which figure number to display heatmap in (default=new)
@@ -56,30 +60,46 @@ else
     figure(figNum); clf
 end
 switch lower(system)
-    case {'follicle','mouse','hair'}
+    case {'follicle','hair'}
         axis([0 1100 -1100 0])
-        is3d=false;
+        scat=false;
+        dim=2;
     case {'zebrafish','satija','seurat'}
         axis([-1.2 1.2 -.5 1.5])
-        is3d=false;
+        scat=false;
+        dim=2;
     case {'drosophila','fly','distmap'}
-        is3d=true;
+        scat=true;
+        dim=3;
+    case {'brain','mousebrain','visiumbrain', ...
+            'cortex','mousecortex','visiumcortex', ...
+            'brainpost','mousebrainpost','visiumpost', ...
+            'brainant','mousebrainant','visiumant'}
+        scat=true;
+        dim=2;
     otherwise
         error('First argument is not a valid system name.')
 end
-if ~is3d
+if ~scat
+    % if system is visualized with patches
     for i=1:size(Patches,1)
         hold on
         patch(Vertices(Patches{i},1),Vertices(Patches{i},2),1*Corr(cellnum,i))
     end
 else
-    % Drosophila is 3d, so use scatter3 instead of patches
-    % Centers should hold (x,y,z) coords
-    scatter3(Centers(:,1),Centers(:,2),Centers(:,3), ...
-        20*ones(size(Centers,1),1),Corr(cellnum,:),'o','filled')
-    view(0,0)
+    % if system is visualized with scatter plot
+    if dim==3
+        % Centers should hold (x,y,z) coords
+        scatter3(Centers(:,1),Centers(:,2),Centers(:,3), ...
+            20*ones(size(Centers,1),1),Corr(cellnum,:),'o','filled')
+        view(0,0)
+    else
+        % Centers should hold (x,y) coords
+        scatter(Centers(:,1),Centers(:,2),20*ones(size(Centers,1),1), ...
+            Corr(cellnum,:),'o','filled')
+    end
     axis square
-    axis equal
+    axis equal    
 end
 map=[linspace(0,1,10)' linspace(0,1,10)' ones(10,1); ...
 ones(10,1) linspace(1,0,10)' linspace(1,0,10)'];
@@ -87,11 +107,17 @@ colormap(map)
 colorbar
 title(titletext);
 if known
-    if is3d
+    if scat
         hold on
-        scatter3(Centers(cellnum,1),Centers(cellnum,2),Centers(cellnum,3), ...
-            100,Corr(cellnum,cellnum),'o','filled', ...
-            'LineWidth',10,'MarkerEdgeColor','black')
+        if dim==3
+            scatter3(Centers(cellnum,1),Centers(cellnum,2),Centers(cellnum,3), ...
+                100,Corr(cellnum,cellnum),'o','filled', ...
+                'LineWidth',10,'MarkerEdgeColor','black')
+        else
+            scatter(Centers(cellnum,1),Centers(cellnum,2), ...
+                50,Corr(cellnum,cellnum),'o','filled', ...
+                'LineWidth',3,'MarkerEdgeColor','black')
+        end
     else
         patch(Vertices(Patches{cellnum},1),Vertices(Patches{cellnum},2), ...
             Corr(cellnum,cellnum),'LineWidth',3,'EdgeColor','black')        

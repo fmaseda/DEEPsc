@@ -1,4 +1,4 @@
-function [net,info,inputs,outputs]=TrainMatchingNNAsMetric(Atlas,varargin)
+function [net,info,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 %% Trains a DEEPsc network on the provided spatial reference atlas
 %
 % Inputs
