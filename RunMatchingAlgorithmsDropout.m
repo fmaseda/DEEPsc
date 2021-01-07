@@ -73,6 +73,8 @@ for k = 1:2:length(varargin)
             doPCA = varargin{k+1};
         case 'pcadims'
             PCAdims = varargin{k+1};
+        otherwise
+            error(['Unrecognized input parameter ' varargin{k}])
     end
 end
 

@@ -1,4 +1,4 @@
-function [net,info,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
+function [net,info,Atlas,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 %% Trains a DEEPsc network on the provided spatial reference atlas
 %
 % Inputs
@@ -30,11 +30,20 @@ function [net,info,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 %   doPCA:              boolean, whether or not to perform PCA on Atlas
 %                       before training (default=true)
 %   PCAdims:            integer, number of PCA components to keep (default=8)
+%   doUMAP:             boolean, wehter or not to perform UMAP on Atlas
+%                       before training (default=false); if doPCA=true, PCA
+%                       is performed first, then UMAP is performed on the
+%                       PCA space
+%   UMAPdims:           integer, number of UMAP components to keep (default=8)
+%   UMAPneighbors:      integer, number of neighbors to consider in UMAP
+%                       algorithm (default=30)
 %
 %
 % Outputs
 %   net:                The trained DEEPsc network
 %   info:               Training info (loss, RMSE per iteration)
+%   Atlas:              If dim reduction was done, this contains the
+%                       reduced atlas
 %   inputs:             4D array of training data, format that DEEPsc
 %                       network requires
 %   outputs:            array of labels for each input
@@ -69,6 +78,14 @@ for k = 1:2:length(varargin)
             doPCA = varargin{k+1};
         case 'pcadims'
             PCAdims = varargin{k+1};
+        case 'doumap'
+            doUMAP = varargin{k+1};
+        case 'umapdims'
+            UMAPdims = varargin{k+1};
+        case 'umapneighbors'
+            UMAPneighbors = varargin{k+1};
+        otherwise
+            error(['Unrecognized input parameter ' varargin{k}])
     end
 end
 
@@ -103,11 +120,20 @@ end
 if ~exist('trainingMultiple','var') || isempty(trainingMultiple)
     trainingMultiple = 99;
 end
-if ~exist('usePCA','var') || isempty(doPCA)
+if ~exist('doPCA','var') || isempty(doPCA)
     doPCA = true;
 end
 if ~exist('PCAdims','var') || isempty(PCAdims)
     PCAdims = 8;
+end
+if ~exist('doUMAP','var') || isempty(doUMAP)
+    doUMAP = false;
+end
+if ~exist('UMAPdims','var') || isempty(UMAPdims)
+    UMAPdims = 8;
+end
+if ~exist('UMAPneighbors','var') || isempty(UMAPneighbors)
+    UMAPneighbors = 30;
 end
 
 % set up string for using parallel computing
@@ -116,21 +142,27 @@ if ~useParallel
 else
     execEnvStr='parallel';
 end
-%% run PCA on Atlas
+%% Dimensionality reduction
 if doPCA
     [~,Atlas]=pca(Atlas*1);
     Atlas=Atlas(:,1:PCAdims);   % keep only PCAdims principal components
-
-    % normalize to [0,1]
-    Atlas=Atlas-min(Atlas);
-    Atlas=NormalizeRNAseq(Atlas,'linear');
 end
 
+if doUMAP
+    Atlas=run_umap(Atlas,'n_components',UMAPdims,'verbose','none',...
+        'n_neighbors',UMAPneighbors, ...
+        'match_supervisors',1); % necessary to suppress warning
+end
+
+% normalize to [0,1] by gene
+Atlas = Atlas-min(Atlas);
+Atlas = NormalizeRNAseq(Atlas,'linear');
+
+%% build inputs/outputs matrices
 [P,G] = size(Atlas);        % P=number of atlas positions, G=number of atlas genes
 inputs = zeros(2*G,P^2);    % each input is vector of position i and position j
 outputs = zeros(P^2,1);     % output 1 if positions match, 0 if not
 
-%% build inputs/outputs matrices
 currentIndex = 1;
 for i=1:P
     for j=1:P

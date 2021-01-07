@@ -36,6 +36,13 @@ function varargout=MeasureMatchingRobustness(method,Atlas,varargin)
 %   doPCA:              boolean, whether or not to perform PCA on Atlas/SCD
 %                       before mapping (default=false)
 %   PCAdims:            integer, number of PCA components to keep (default=8)
+%   doUMAP:             boolean, wehter or not to perform UMAP on Atlas
+%                       before training (default=false); if doPCA=true, PCA
+%                       is performed first, then UMAP is performed on the
+%                       PCA space
+%   UMAPdims:           integer, number of UMAP components to keep (default=8)
+%   UMAPneighbors:      integer, number of neighbors to consider in UMAP
+%                       algorithm (default=30)
 %   showPlot:           boolean, whether or not to show the statisticts
 %                       in a new figure (default=true)
 %   normMat:            if method='weighted', this is the matrix of the
@@ -78,6 +85,12 @@ for k = 1:2:length(varargin)
             doPCA = varargin{k+1};
         case 'pcadims'
             PCAdims = varargin{k+1};
+        case 'doumap'
+            doUMAP = varargin{k+1};
+        case 'umapdims'
+            UMAPdims = varargin{k+1};
+        case 'umapneighbors'
+            UMAPneighbors = varargin{k+1};
         case 'showplot'
             showPlot = varargin{k+1};
         case 'numsteps'
@@ -86,6 +99,8 @@ for k = 1:2:length(varargin)
             numRunsEachStep = varargin{k+1};
         case 'useparallel'
             useParallel = varargin{k+1};
+        otherwise
+            error(['Unrecognized input parameter ' varargin{k}])
     end
 end
 
@@ -120,14 +135,35 @@ end
 if ~exist('PCAdims','var') || isempty(PCAdims)
     PCAdims=8;
 end
+if ~exist('doUMAP','var') || isempty(doUMAP)
+    doUMAP = false;
+end
+if ~exist('UMAPdims','var') || isempty(UMAPdims)
+    UMAPdims = 8;
+end
+if ~exist('UMAPneighbors','var') || isempty(UMAPneighbors)
+    UMAPneighbors = 30;
+end
 if ~exist('useParallel','var') || isempty(useParallel)
     useParallel=true;
 end
 
+%% Dimensionality reduction
+% if doPCA
+%     [~,Atlas]=pca(Atlas*1);
+%     Atlas=Atlas(:,1:PCAdims);
+% end
+% if doUMAP
+%     Atlas=run_umap(Atlas,'n_components',UMAPdims,'verbose','none',...
+%         'n_neighbors',UMAPneighbors,...
+%         'match_supervisors',1); % needed to suppress warning
+% end
+
 %% begin calculation
 % calculate accuracy and precision with no noise
 Corr=RunMatchingAlgorithms(method,Atlas,Atlas,'normMat',normMat,'NN',NN, ...
-        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims, ...
+        'doUMAP',doUMAP,'UMAPdims',UMAPdims,'UMAPneighbors',UMAPneighbors);
 [accuracy,precision]=CorrErrorKnownResult(Corr);
 
 % calculate accuracy and precision for various levels of gaussian noise in
@@ -143,7 +179,8 @@ if useParallel
     %         fprintf('i=%d, j=%d\n',i,j)
             NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
             NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
-                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims, ...
+                        'doUMAP',doUMAP,'UMAPdims',UMAPdims,'UMAPneighbors',UMAPneighbors);
             [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
             accuracyArray(j,i+1)=accuracy;
             precisionArray(j,i+1)=precision;
@@ -160,7 +197,8 @@ else
     %         fprintf('i=%d, j=%d\n',i,j)
             NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
             NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
-                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims);
+                        'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims, ...
+                        'doUMAP',doUMAP,'UMAPdims',UMAPdims,'UMAPneighbors',UMAPneighbors);
             [accuracy,precision]=CorrErrorKnownResult(NoisyCorr);
             v1(j)=accuracy;
             v2(j)=precision;

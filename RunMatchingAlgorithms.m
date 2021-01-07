@@ -47,6 +47,13 @@ function Corr=RunMatchingAlgorithms(method,Atlas,SCD,varargin)
 %   doPCA:              boolean, whether or not to perform PCA on Atlas/SCD
 %                       before mapping (default=false)
 %   PCAdims:            integer, number of PCA components to keep (default=8)
+%   doUMAP:             boolean, wehter or not to perform UMAP on Atlas
+%                       before training (default=false); if doPCA=true, PCA
+%                       is performed first, then UMAP is performed on the
+%                       PCA space
+%   UMAPdims:           integer, number of UMAP components to keep (default=8)
+%   UMAPneighbors:      integer, number of neighbors to consider in UMAP
+%                       algorithm (default=30)
 %
 %
 % Outputs
@@ -72,6 +79,14 @@ for k = 1:2:length(varargin)
             doPCA = varargin{k+1};
         case 'pcadims'
             PCAdims = varargin{k+1};
+        case 'doumap'
+            doUMAP = varargin{k+1};
+        case 'umapdims'
+            UMAPdims = varargin{k+1};
+        case 'umapneighbors'
+            UMAPneighbors = varargin{k+1};
+        otherwise
+            error(['Unrecognized input parameter ' varargin{k}])
     end
 end
 
@@ -85,29 +100,42 @@ end
 if ~exist('PCAdims','var') || isempty(PCAdims)
     PCAdims = 8;
 end
+if ~exist('doUMAP','var') || isempty(doUMAP)
+    doUMAP = false;
+end
+if ~exist('UMAPdims','var') || isempty(UMAPdims)
+    UMAPdims = 8;
+end
+if ~exist('UMAPneighbors','var') || isempty(UMAPneighbors)
+    UMAPneighbors = 30;
+end
 
-%% setup
-C=size(SCD,1);      % numberCells
-P=size(Atlas,1);    % numberPositions
-G=size(Atlas,2);    % numberGenes
-
+%% Dimensionality reduction
 if doPCA
-    if G>PCAdims
-        G=PCAdims;
-    end
     [PCA_coefs,Atlas]=pca(Atlas*1);
-    Atlas=Atlas(:,1:G);
-    Atlas=Atlas-min(Atlas);
-    Atlas=NormalizeRNAseq(Atlas,'linear');
+    Atlas=Atlas(:,1:PCAdims);
     
     SCD=SCD*PCA_coefs;
-    SCD=SCD(:,1:G);
-    SCD=SCD-min(SCD);
-    SCD=NormalizeRNAseq(SCD,'linear');
+    SCD=SCD(:,1:PCAdims);
 end
+if doUMAP
+    [Atlas,umap]=run_umap(Atlas,'n_components',UMAPdims,'verbose','none',...
+        'n_neighbors',UMAPneighbors,...
+        'match_supervisors',1); % needed to suppress warning
+    SCD=umap.transform(SCD);
+end
+
+% normalize to [0,1]
+Atlas=Atlas-min(Atlas);
+Atlas=NormalizeRNAseq(Atlas,'linear');
+SCD=SCD-min(SCD);
+SCD=NormalizeRNAseq(SCD,'linear');
 
 
 %% run method
+C=size(SCD,1);      % numberCells
+P=size(Atlas,1);    % numberPositions
+G=size(Atlas,2);    % numberGenes
 Corr=zeros(C,P);
 
 switch lower(method)
@@ -445,6 +473,9 @@ switch lower(method)
     %
     
     %
+    
+    otherwise
+        error(['Unrecognized method ' method])
     
 end
 

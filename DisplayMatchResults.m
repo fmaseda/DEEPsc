@@ -15,7 +15,7 @@ function DisplayMatchResults(system,Corr,cellnum,varargin)
 %
 % Required Name-Value pairs:
 %   If system='follicle' or 'zebrafish', require Patches and Vertices
-%   If system='drosophila'or 'cortex', require Centers
+%   If system='drosophila' or 'cortex', require Centers
 %
 % Optional inputs
 %   figNum:         integer, which figure number to display heatmap in (default=new)
@@ -42,6 +42,8 @@ for k = 1:2:length(varargin)
             titletext = varargin{k+1};
         case 'knownorigin'
             known = varargin{k+1};
+        otherwise
+            error(['Unrecognized input parameter ' varargin{k}])
     end
 end
 
@@ -91,12 +93,13 @@ else
     if dim==3
         % Centers should hold (x,y,z) coords
         scatter3(Centers(:,1),Centers(:,2),Centers(:,3), ...
-            20*ones(size(Centers,1),1),Corr(cellnum,:),'o','filled')
+            20*ones(size(Centers,1),1),Corr(cellnum,:),'o','filled', ...
+            'MarkerEdgeColor',[.7 .7 .7])
         view(0,0)
     else
         % Centers should hold (x,y) coords
         scatter(Centers(:,1),Centers(:,2),20*ones(size(Centers,1),1), ...
-            Corr(cellnum,:),'o','filled')
+            Corr(cellnum,:),'o','filled','MarkerEdgeColor',[.7 .7 .7])
     end
     axis square
     axis equal    
