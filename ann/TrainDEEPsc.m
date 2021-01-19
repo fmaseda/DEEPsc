@@ -20,6 +20,10 @@ function [net,info,Atlas,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 %                       worse than previous best (default=Inf)
 %   useParallel:        boolean, whether or not to use parallel processing
 %                       if available (default=false)
+%   showPlot:           boolean, whether or not to display plot of training
+%                       progress (default=true)
+%   Verbose:            boolean, whether or not to display training
+%                       progress in command window (default=true)
 %   trainingMode:       1 = uses all data and splits randomly, grows
 %                       quadratically with size of Atlas;
 %                       2 (default) = uses only fraction of matching targets,
@@ -51,6 +55,7 @@ function [net,info,Atlas,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 % ----------
 % Example usage
 %   net = TrainMatchingNNAsMetric(MyAtlas,'iterations',5000,'useParallel',true)
+
 %% Parse input arguments
 for k = 1:2:length(varargin)
     switch lower(varargin{k})
@@ -70,6 +75,10 @@ for k = 1:2:length(varargin)
             validationPatience = varargin{k+1};
         case 'useparallel'
             useParallel = varargin{k+1};
+        case 'showplot'
+            showPlot = varargin{k+1};
+        case 'verbose'
+            verbose = varargin{k+1};
         case 'trainingmode'
             trainingMode  = varargin{k+1};
         case 'trainingmultiple'
@@ -114,6 +123,12 @@ end
 if ~exist('useParallel','var') || isempty(useParallel)
     useParallel = false;
 end
+if ~exist('showPlot','var') || isempty(showPlot)
+    showPlot = true;
+end
+if ~exist('verbose','var') || isempty(verbose)
+    verbose = true;
+end
 if ~exist('trainingMode','var') || isempty(trainingMode)
     trainingMode = 2;
 end
@@ -136,12 +151,18 @@ if ~exist('UMAPneighbors','var') || isempty(UMAPneighbors)
     UMAPneighbors = 30;
 end
 
-% set up string for using parallel computing
+%% set up strings for training
 if ~useParallel
     execEnvStr='auto';
 else
     execEnvStr='parallel';
 end
+if showPlot
+    plotStr='training-progress';
+else
+    plotStr='none';
+end
+
 %% Dimensionality reduction
 if doPCA
     [~,Atlas]=pca(Atlas*1);
@@ -245,8 +266,8 @@ options = trainingOptions('adam', ...
     'ValidationFrequency',ceil(iterations/validationNumber), ...
     'ValidationPatience',validationPatience, ...
     'ExecutionEnvironment',execEnvStr, ...  % whether or not to use parallel
-    ... % don't output training updates to command window, only plots
-    'Verbose',true,'Plots','training-progress');   
+    ... % whether or not to output training updates to command window/plots
+    'Verbose',verbose,'Plots',plotStr);   
 
 %% train the network
 [net,info]=trainNetwork(trainInputs,trainOutputs,layers,options);
