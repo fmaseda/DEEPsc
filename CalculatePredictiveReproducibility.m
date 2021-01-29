@@ -35,8 +35,8 @@ function [predrep,predrepArray,predictedVals]=CalculatePredictiveReproducibility
 %                       
 %
 % Optional inputs
-%   normMat:            if method='weighted', this is the matrix of the
-%                       weighted norm
+%   normMat:            if method='weighted', this is a cell array of the
+%                       weighted norms for each of the folds
 %   NNs:                if method='deepsc', a cell array of the trained DEEPsc
 %                       networks from TrainMatchingNNAsMetric(). Number of
 %                       networks must match number of folds in
@@ -102,14 +102,11 @@ C=size(SCD,1);      % numberCells
 P=size(Atlas,1);    % numberPositions
 G=size(Atlas,2);    % numberGenes
 
-if ~exist('normMat','var') || isempty(normMat)
-    normMat=eye(G);     % if method='weighted', default to identity matrix
-end
 if ~exist('numIter','var') || isempty(numIter)
     numIter = 1;
 end
 if ~exist('Patches','var') || isempty(Patches)
-    Patches={};         % will cause an error if method requires it
+    Patches={};     % will cause an error if method requires it
 end
 if ~exist('doPCA','var') || isempty(doPCA)
     doPCA = false;
@@ -121,7 +118,10 @@ if ~exist('numFolds','var') || isempty(numFolds)
     numFolds = G;
 end
 if ~exist('NNs','var') || isempty(NNs)
-    NNs=cell(1,numFolds);   % will cause error if method='deepsc' and no NNs supplied
+    NNs=cell(1,numFolds);       % will cause error if method='deepsc' and no NNs supplied
+end
+if ~exist('normMat','var') || isempty(normMat)
+    normMat=cell(1,numFolds);   % will cause an error if method requires it
 end
 
 %% split atlas into folds for cross validation
@@ -164,7 +164,7 @@ for k=1:numFolds
     ind=1:G;
     ind(foldIndices{k})=[];
     Corr=RunMatchingAlgorithms(method,Atlas(:,ind),SCD(:,ind),...
-        'normMat',normMat(ind,ind),'NN',NNs{k},'numIter',numIter,'Patches',Patches,...
+        'normMat',normMat{k},'NN',NNs{k},'numIter',numIter,'Patches',Patches,...
         'doPCA',doPCA,'PCAdims',PCAdims);
     % use Corr to predict value of dropped out genes for each cell based on
     % other genes in the atlas

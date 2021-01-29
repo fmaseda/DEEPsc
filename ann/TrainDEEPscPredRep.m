@@ -60,6 +60,7 @@ function [nets,foldIndices,info,Atlases]=TrainDEEPscPredRep(Atlas,varargin)
 % ----------
 % Example usage
 %   [nets,ind] = TrainDEEPscPredRep(MyAtlas,'iterations',5000,'useParallel',true,'numFolds',5)
+
 %% Find numFolds and foldIndices arguments if there, remove them, and set default
 for k = 1:2:length(varargin)
     switch lower(varargin{k})

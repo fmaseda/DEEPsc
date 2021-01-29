@@ -74,8 +74,14 @@ where `system` can be one of three strings: `'follicle'`, `'zebrafish'`, or `'dr
 
 ## Determining predictive reproducibility
 
-To quantify the performance of a given method on actual scRNA-seq data where the origin is unknown, we also define a quantify called the predictive reproducibility, determined from a LOOCV scheme where we run a given method using all but one gene in the spatial reference atlas, then use the heatmap of correspondence scores described in the previous section to reconstruct the dropped out gene. To detemine this value for a given method is a two step process. First, generate the various correspondence score arrays from dropping out each gene with `RunMatchingAlgorithmsDropout()`, and then determine the predictive reproducibility with `CorrErrorUnknownResult()`. For example, to determine the predictive reproducibility of DistMap on the follicle system, call
+To quantify the performance of a given method on actual scRNA-seq data where the origin is unknown, we also define a quantity called the predictive reproducibility, determined from a k-fold cross validation scheme where we split the reference atlas into k different folds, each containing some number of genes, then map the cells using all but one fold. We then use the heatmap of correspondence scores for each method to reconstruct each gene in the dropped out fold. To do this, we use the `CalculatePredictiveReproducibility()` function. For example, to determine the predictive reproducibility of DistMap using 5-fold cross validation, call
 ```
-Corr = RunMatchingAlgorithmsDropout('distmap',MyAtlas,SCD);
-pred_rep = CorrErrorUnknownResult(Corr,MyAtlas,SCD)
+[pred_rep, array, values] = CalculatePredictiveReproducibility('distmap',MyAtlas,SCD,'numFolds',5)
 ```
+where the second output is a 1xC array of the cell-by-cell predictive reproducibility, and the third output is the reconstructed atlas obtained by k-fold CV.
+
+Note that to determine the predictive reproducibility of a DEEPsc network, additional training is required since the mapping with only a subset of genes cannot be done with the original network. Indeed for k-fold CV, k separate networks must be trained. To train a DEEPsc network to determine predictive reproducibility, use
+```
+[nets, indices] = TrainDEEPscPredRep(MyAtlas,'numFolds',k)
+```
+then calculate predictive reproducibility by setting the `NNs` property to `nets` and `foldIndices` to `indices`.

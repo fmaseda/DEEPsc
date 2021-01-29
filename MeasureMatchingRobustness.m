@@ -194,7 +194,7 @@ else
         v1=accuracyArray(:,i+1);
         v2=precisionArray(:,i+1);
         for j=1:numRunsEachStep
-    %         fprintf('i=%d, j=%d\n',i,j)
+%             fprintf('i=%d, j=%d\n',i,j)
             NoisyAtlas=AddNoise(Atlas,i/numSteps,0,1);
             NoisyCorr=RunMatchingAlgorithms(method,Atlas,NoisyAtlas,'normMat',normMat,'NN',NN, ...
                         'numIter',numIter,'Patches',Patches,'doPCA',doPCA,'PCAdims',PCAdims, ...
