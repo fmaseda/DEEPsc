@@ -62,8 +62,13 @@ DisplayMatchResults('follicle',Corr_DEEPsc,i,'Patches',Patches_Follicle,...
 
 %% Load scRNA-seq and compute predictive reproducibility
 load([pwd() '/scRNAseq/Follicle.mat'])
-% train DEEPsc ensemble first
-[DEEPscPredRepNets,indices]=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4);
+% train new DEEPsc ensembles first
+[DEEPscPredRepNets1,indices]=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4);
+DEEPscPredRepNets2=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
+DEEPscPredRepNets3=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
+
+% train new LMNN metrics also
+LMNNPredRep=TrainLMNNPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
 
 % compute pred. rep. for each method
 predReps = zeros(9,1);
@@ -82,9 +87,16 @@ predReps(6) = CalculatePredictiveReproducibility('inf',Atlas_FollicleContinuous,
 predReps(7) = CalculatePredictiveReproducibility('%',Atlas_FollicleContinuous, ...
     SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices);
 predReps(8) = CalculatePredictiveReproducibility('lmnn',Atlas_FollicleContinuous, ...
-    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'normMat',LMNN);
-predReps(9) = CalculatePredictiveReproducibility('achim',Atlas_FollicleContinuous, ...
-    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets);
+    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'normMat',LMNNPredRep);
+
+% for DEEPsc, average over three results
+temp = CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
+    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets1);
+temp = temp+CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
+    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets2);
+temp = temp+CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
+    SCD_Follicle_normalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets3);
+predReps(9) = temp/3;
 
 array2table(predReps,...
     'RowNames',{'Achim','Seurat','DistMap','Peng','2-norm','Inf-norm','%diff','LMNN','DEEPsc'},...

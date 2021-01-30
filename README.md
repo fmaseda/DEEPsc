@@ -6,7 +6,18 @@
 
 ## Quick start: Test on follicle data
 
-Since the murine follicle system has the smallest reference atlas with *G=8* genes and thus takes the least amount of time to train, we have included a plug-and-play test for this system in the `/tests` folder. To run this test, simply navigate to the DEEPsc folder in MATLAB and run `TestFollicle` from the command window.
+Since the murine follicle system has the smallest reference atlas with *G=8* genes and thus takes the least amount of time to train, we have included a plug-and-play test for this system in the `/tests` folder. To run this test, simply navigate to the DEEPsc folder in MATLAB and run `TestFollicle` from the command window. The test file does the following:
+
+1. Determines the performance score of each method.
+	* Trains a DEEPsc model on the imported follicle atlas.
+	* Determines an LMNN metric for the same.
+	* Determines the performance score of each studied method using the atlas positions as simulated scRNA-seq data and reports the results in table form.
+	* Displays a heatmap of spatial mappings for a randomly chosen example "cell".
+2. Calculates the predictive reproducibility of each method.
+	* Trains three DEEPsc ensembles on the follicle atlas to be averaged.
+	* Determines new LMNN metrics.
+	* Calculates the predictive reproducibility using 4-fold validation, averaging the results for DEEPsc, and reporting the results in table form.
+
 
 The following procedures can be followed for other systems or to better understand this test case:
 
@@ -23,7 +34,7 @@ The `/atlas` subfolder includes several `.mat` files which contain the matrices 
 ```
 load('/atlas/SYSTEM.mat')
 ```
-where `SYSTEM` is replaced by either `Follicle`, `Drosophila`, or `Zebrafish`. For each system, several atlases are imported, including a binary and a continuous version, clearly labelled, e.g. `Atlas_ZebrafishBinary`.
+where `SYSTEM` is replaced by either `Follicle`, `Drosophila`, `Zebrafish`, or `MouseCortex2`. For each system, several atlases are imported, including a binary and a continuous version, clearly labelled, e.g. `Atlas_ZebrafishBinary`.
 
 ### scRNA-seq datasets
 
@@ -35,9 +46,11 @@ A DEEPsc network accepts a low-dimensional feature vector corresponding to a sin
 
 To train a network in MATLAB, run the following
 ```
-net = TrainMatchingNNAsMetric(MyAtlas,'iterations',5000,'useParallel',true)
+net = TrainDEEPsc(MyAtlas,'iterations',5000,'useParallel',true)
 ```
-where `MyAtlas` is the (continuous) reference atlas you want to train on. Training options such as whether or not to perform PCA and how many prinicpal components to keep, how much noise to include in the training process, how many iterations to run, what kind of validation to use, and whether or not to use parallel processing if available, are all described in the documentation of `TrainMatchingNNAsMetric()`.
+where `MyAtlas` is the (continuous) reference atlas you want to train on. Training options such as whether or not to perform PCA and how many prinicpal components to keep, how much noise to include in the training process, how many iterations to run, what kind of validation to use, and whether or not to use parallel processing if available, are all described in the documentation of `TrainDEEPsc()`.
+
+The networks trained in the manuscript are available to be imported as .mat files in the `/ann` folder, e.g. `/ann/Follicle.mat`.
 
 ## Mapping cells with DEEPsc or other baseline methods
 
@@ -51,7 +64,9 @@ where `method` can be one of several strings (e.g. `'Seurat'`, `'DistMap'`, `'DE
 ```
 Corr = RunMatchingAlgorithms('deepsc',MyAtlas,SCD,'NN',DEEPscNet,'doPCA',true)
 ```
-The output `Corr` is a *C x P* array where `Corr(i,j)` contains the likelihood that cell `i` in the scRNA-seq dataset originated from point `j` in the spatial reference atlas.
+where `DEEPscNet` contains the trained DEEPsc network. The output `Corr` is a *C x P* array where `Corr(i,j)` contains the likelihood that cell `i` in the scRNA-seq dataset originated from point `j` in the spatial reference atlas.
+
+Note that the LMNN baseline requires training a metric to be passed in as the `normMat` argument, which can be done with the `/utils/lmnn/lmnn2()` function. The trained metrics used in the manuscript are included in the `/utils/lmnn/LMNN.mat` file.
 
 ## Quantifying spatial mapping performance
 
@@ -85,3 +100,5 @@ Note that to determine the predictive reproducibility of a DEEPsc network, addit
 [nets, indices] = TrainDEEPscPredRep(MyAtlas,'numFolds',k)
 ```
 then calculate predictive reproducibility by setting the `NNs` property to `nets` and `foldIndices` to `indices`.
+
+The LMNN baseline also requires training separate metrics for each of the reduced spaces, which can be achieved with the `/utils/lmnn/TrainLMNNPredRep()` function.
