@@ -102,3 +102,5 @@ Note that to determine the predictive reproducibility of a DEEPsc network, addit
 then calculate predictive reproducibility by setting the `NNs` property to `nets` and `foldIndices` to `indices`.
 
 The LMNN baseline also requires training separate metrics for each of the reduced spaces, which can be achieved with the `/utils/lmnn/TrainLMNNPredRep()` function.
+
+The trained DEEPsc networks used in the manuscript are included in `/scRNAseq/PredRep.mat` for importing.
