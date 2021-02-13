@@ -3,7 +3,7 @@ load([pwd() '/atlases/Follicle.mat'])
 
 %% train DEEPsc network
 iterations = 20000;
-DEEPscNet = TrainMatchingNNAsMetric(Atlas_FollicleContinuous,'iterations',iterations,'useParallel',true);
+DEEPscNet = TrainDEEPsc(Atlas_FollicleContinuous,'iterations',iterations,'useParallel',true);
 
 %% determine LMNN matrix for follicle atlas for baseline comparison
 LMNN=lmnn2(Atlas_FollicleContinuous);
