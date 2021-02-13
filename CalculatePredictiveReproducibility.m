@@ -1,6 +1,8 @@
-function [predrep,predrepArray,predictedVals]=CalculatePredictiveReproducibility(method,Atlas,SCD,varargin)
-%% Runs the specified mapping method to map SCD to Atlas using a LOOCV scheme,
-%  outputting correspondence scores for each pair for each dropped out gene
+function [predrep,predrepArray_SCD,predrepArray_Atlas,predictedVals_SCD,predictedVals_Atlas,Corr] = ...
+                CalculatePredictiveReproducibility(method,Atlas,SCD,varargin)
+%% Runs the specified mapping method to map SCD to Atlas using a k-fold CV scheme,
+%  outputting correspondence scores for each pair for each dropped out
+%  gene, then reconstructing the dropped out gene based on the mapping
 %
 % Inputs
 %   method:             string
@@ -55,23 +57,27 @@ function [predrep,predrepArray,predictedVals]=CalculatePredictiveReproducibility
 %                       indices of genes to predict in each of the folds; if
 %                       not specified, fold indices are chosen randomly
 %
-%
 % Outputs
-%   predrep:            double in [0,1], measure of predictive
-%                       reproducibility
-%   predrepArray:       length C array of predictive reproducibility
+%   predrep:            length 4 array in [0,1], four measures of predictive
+%                       reproducibility, [R_scd_zero,R_scd_nonzero,
+%                                         R_atlas_zero,R_atlas_nonzero]
+%   predrepArray_SCD:   Cx2 array of predictive reproducibility measures
 %                       cell-by-cell
-%   predictedVals:      CxG array of reconstructed gene expression from
-%                       cross validation
+%   predrepArray_Atlas: Px2 array of predictive reproducibility measures
+%                       position-by-position
+%   predictedVals_SCD:  CxG array of reconstructed gene expression in SCD
+%                       from cross validation
+%   predictedVals_Atlas:PxG array of reconstructed gene expression in Atlas
+%                       from cross validation
+%   Corr:               cell array of CxP Corr matrices from each fold
 %
 % ----------
 % Example usage
 %   predrep = CalculatePredictiveReproducibility('2norm',MyAtlas,SCD,'numFolds',5)
-%   [predrep,array,vals] = CalculatePredictiveReproducibility('deepsc',MyAtlas, ...
-%                       'numFolds',5,'NNs',{DEEPscNNFold1,DEEPscNNFold2, ...
-%                       DEEPscNNFold3,DEEPscNNFold4,DEEPscNNFold5}, ...
-%                       'FoldIndices', {DEEPscInd1,DEEPscInd2,DEEPscInd3, ...
-%                       DEEPscInd4,DEEPscInd5},'doPCA',true)
+%   [predrep, array_scd, array_atlas] = ...
+%       CalculatePredictiveReproducibility('deepsc',MyAtlas,'numFolds',5, ...
+%           'NNs',DEEPscPredRep_Nets,'FoldIndices', DEEPscPredRep_Indices, ...
+%           'doPCA',true)
 
 %% parse input arguments
 for k = 1:2:length(varargin)
@@ -156,24 +162,57 @@ end
 
 %% Calculate predictive reproducibility for each fold
 
-SCD=NormalizeRNAseq(SCD,'linear');  % normalize SCD
-predrepArray=zeros(C,1);    % predictive reproducibility for each cell
-predictedVals=zeros(C,G);   % reconstructed gene expression
+predrepArray_SCD=zeros(C,2);    % predictive reproducibility for each cell (1=zero, 2=nonzero)
+predictedVals_SCD=zeros(C,G);    % reconstructed gene expression in SCD
+
+predrepArray_Atlas=zeros(P,2);  % predictive reproducibility for each position (1=zero, 2=nonzero)
+predictedVals_Atlas=zeros(P,G);  % reconstructed gene expression in Atlas
+
+Corr=cell(1,numFolds);      % correspondence matrices used for reconstruction
+predrep=zeros(G,4);         % [R_scd_zero,R_scd_nonzero,R_atlas_zero,R_atlas_nonzero]
 
 for k=1:numFolds
     ind=1:G;
     ind(foldIndices{k})=[];
-    Corr=RunMatchingAlgorithms(method,Atlas(:,ind),SCD(:,ind),...
+    % generate Corr using all other folds
+    Corr{k}=RunMatchingAlgorithms(method,Atlas(:,ind),SCD(:,ind),...
         'normMat',normMat{k},'NN',NNs{k},'numIter',numIter,'Patches',Patches,...
         'doPCA',doPCA,'PCAdims',PCAdims);
-    % use Corr to predict value of dropped out genes for each cell based on
-    % other genes in the atlas
-    for i=1:length(foldIndices{k})
-        predictedVals(:,foldIndices{k}(i))=((Corr.^8)./(sum((Corr.^8),2)+eps())) ...
-            *Atlas(:,foldIndices{k}(i));        % predicted gene i value for each cell
-        predrepArray=predrepArray+abs(predictedVals(:,foldIndices{k}(i)) ...
-            -SCD(:,foldIndices{k}(i)));         % error in predicting gene i for each cell in SCD
-    end
+    
+    % reconstruct entire atlas with Corr, but only save this fold's genes
+    C = Corr{k};
+    C = C./sum(C);      % normalize over cells
+    tmp = C'*SCD;
+    predictedVals_Atlas(:,foldIndices{k}) = tmp(:,foldIndices{k});
+    
+    % same as above but now recontruct SCD
+    C = Corr{k};
+    C = C./sum(C,2);    % normalize over positions
+    tmp = C*Atlas;
+    predictedVals_SCD(:,foldIndices{k}) = tmp(:,foldIndices{k});
 end
-predrepArray=1-predrepArray/G;    % mean error per gene
-predrep=mean(predrepArray);     % single error value
+
+abs_diff_SCD = abs(predictedVals_SCD - SCD);
+SCD_zero_mask = (SCD == 0);
+abs_diff_Atlas = abs(predictedVals_Atlas - Atlas);
+Atlas_zero_mask = (Atlas == 0);
+
+% calculate predrep for each gene in SCD and in Atlas separately, then average over genes
+predrep(:,1) = sum(abs_diff_SCD .* SCD_zero_mask,1) ./ sum(SCD_zero_mask,1);
+predrep(:,2) = sum(abs_diff_SCD .* (1-SCD_zero_mask),1) ./ sum(1-SCD_zero_mask,1);
+predrep(:,3) = sum(abs_diff_Atlas .* Atlas_zero_mask,1) ./ sum(Atlas_zero_mask,1);
+predrep(:,4) = sum(abs_diff_Atlas .* (1-Atlas_zero_mask),1) ./ sum(1-Atlas_zero_mask,1);
+predrep(isnan(predrep)) = 0;
+predrep = mean(predrep);    % mean over genes
+
+% predictive reproducibility for zero and nonzero cells in SCD
+predrepArray_SCD(:,1) = sum(abs_diff_SCD .* SCD_zero_mask,2) ./ sum(SCD_zero_mask,2);
+predrepArray_SCD(:,2) = sum(abs_diff_SCD .* (1-SCD_zero_mask),2) ./ sum(1-SCD_zero_mask,2);
+predrepArray_SCD(isnan(predrepArray_SCD)) = 0;
+
+% predictive reproducibility for zero and nonzero positions in Atlas
+predrepArray_Atlas(:,1) = sum(abs_diff_Atlas .* Atlas_zero_mask,2) ./ sum(Atlas_zero_mask,2);
+predrepArray_Atlas(:,2) = sum(abs_diff_Atlas .* (1-Atlas_zero_mask),2) ./ sum(1-Atlas_zero_mask,2);
+predrepArray_Atlas(isnan(predrepArray_Atlas)) = 0;
+
+end

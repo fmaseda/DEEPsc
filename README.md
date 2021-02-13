@@ -89,13 +89,13 @@ where `system` can be one of three strings: `'follicle'`, `'zebrafish'`, or `'dr
 
 ## Determining predictive reproducibility
 
-To quantify the performance of a given method on actual scRNA-seq data where the origin is unknown, we also define a quantity called the predictive reproducibility, determined from a k-fold cross validation scheme where we split the reference atlas into k different folds, each containing some number of genes, then map the cells using all but one fold. We then use the heatmap of correspondence scores for each method to reconstruct each gene in the dropped out fold. To do this, we use the `CalculatePredictiveReproducibility()` function. For example, to determine the predictive reproducibility of DistMap using 5-fold cross validation, call
+To quantify the performance of a given method on actual scRNA-seq data where the origin is unknown, we also define a quantity called the predictive reproducibility, determined from a k-fold cross validation scheme where we split the genes into k different folds, then map the cells using all but one fold. We then use the heatmap of correspondence scores for each method to reconstruct the expression of each gene in the dropped out fold in both the atlas (using the scRNA-seq data) and the scRNA-seq data (using the atlas). To accommodate the sparsity of data, we calculate the predictive reproducibility separately for cells or positions with zero expression and for those with nonzero expression. This results in four values, giving a comprehensive measure of the predictive power of a given method. To generate the predictive reproducibility, we use the `CalculatePredictiveReproducibility()` function. For example, to determine the predictive reproducibility of DistMap using 5-fold cross validation, call
 ```
-[pred_rep, array, values] = CalculatePredictiveReproducibility('distmap',MyAtlas,SCD,'numFolds',5)
+[pred_rep, array_SCD, array_Atlas, rec_SCD, rec_Atlas] = CalculatePredictiveReproducibility('distmap',MyAtlas,SCD,'numFolds',5)
 ```
-where the second output is a 1xC array of the cell-by-cell predictive reproducibility, and the third output is the reconstructed atlas obtained by k-fold CV.
+where the second and third outputs are a 2xC and 2xP array of the cell-by-cell and position-by-position predictive reproducibility, and the fourth and fifth outputs are the reconstructed scRNA-seq data and atlas produced by the k-fold CV.
 
-Note that to determine the predictive reproducibility of a DEEPsc network, additional training is required since the mapping with only a subset of genes cannot be done with the original network. Indeed for k-fold CV, k separate networks must be trained. To train a DEEPsc network to determine predictive reproducibility, use
+Note that to determine the predictive reproducibility of a DEEPsc network, additional training is required since the mapping with only a subset of genes cannot be done with the original network. Indeed for k-fold CV, k separate networks must be trained. To train a group of DEEPsc networks to determine predictive reproducibility, use
 ```
 [nets, indices] = TrainDEEPscPredRep(MyAtlas,'numFolds',k)
 ```
