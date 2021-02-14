@@ -10,7 +10,7 @@ function [net,info,Atlas,inputs,outputs]=TrainDEEPsc(Atlas,varargin)
 %   iterations:         integer, number of iterations to train (default=5000)
 %   trainFrac:          0-1, fraction of data to use for training (default=0.9)
 %   noiseLevel:         0-1, level of Gaussian noise to add to training data
-%                       (default=0.25)
+%                       (default=0.10)
 %   noiseProb:          0-1, probability that Gaussian noise will be added
 %                       during each iteration of training (default=1)
 %   learningRate:       real, learning rate used in training (ADAM, default=.01)
@@ -106,7 +106,7 @@ if ~exist('trainFrac','var') || isempty(trainFrac)
     trainFrac = 0.9;
 end
 if ~exist('noiseLevel','var') || isempty(noiseLevel)
-    noiseLevel = 0.25;
+    noiseLevel = 0.10;
 end
 if ~exist('noiseProb','var') || isempty(noiseProb)
     noiseProb = 1;

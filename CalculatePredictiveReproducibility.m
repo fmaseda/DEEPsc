@@ -203,7 +203,7 @@ predrep(:,2) = sum(abs_diff_SCD .* (1-SCD_zero_mask),1) ./ sum(1-SCD_zero_mask,1
 predrep(:,3) = sum(abs_diff_Atlas .* Atlas_zero_mask,1) ./ sum(Atlas_zero_mask,1);
 predrep(:,4) = sum(abs_diff_Atlas .* (1-Atlas_zero_mask),1) ./ sum(1-Atlas_zero_mask,1);
 predrep(isnan(predrep)) = 0;
-predrep = mean(predrep);    % mean over genes
+predrep = 1-mean(predrep);	% mean over genes
 
 % predictive reproducibility for zero and nonzero cells in SCD
 predrepArray_SCD(:,1) = sum(abs_diff_SCD .* SCD_zero_mask,2) ./ sum(SCD_zero_mask,2);

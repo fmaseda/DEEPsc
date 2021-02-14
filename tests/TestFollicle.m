@@ -3,7 +3,7 @@ load([pwd() '/atlases/Follicle.mat'])
 
 %% train DEEPsc network
 iterations = 20000;
-DEEPscNet = TrainDEEPsc(Atlas_FollicleContinuous,'iterations',iterations,'useParallel',true);
+DEEPscNet = TrainDEEPsc(Atlas_FollicleContinuous,'iterations',iterations,'useParallel',true,'showPlot',false);
 
 %% determine LMNN matrix for follicle atlas for baseline comparison
 LMNN=lmnn2(Atlas_FollicleContinuous);
@@ -38,34 +38,37 @@ array2table(stats,...
     'RowNames',{'Achim','Seurat','DistMap','Peng','2-norm','Inf-norm','%diff','LMNN','DEEPsc'},...
     'VariableNames',{'accuracy','precision','robustness','performance'})
                                                                         
-%% display mapping of random cell
-
+%% display mapping of random simulated cell
 i=randi(size(Atlas_FollicleContinuous,1));
 DisplayMatchResults('follicle',Corr_Achim,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', Achim']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', Achim']);
 DisplayMatchResults('follicle',Corr_Seurat,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', Seurat']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', Seurat']);
 DisplayMatchResults('follicle',Corr_Karaiskos,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', DistMap']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', DistMap']);
 DisplayMatchResults('follicle',Corr_Peng,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', Peng']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', Peng']);
 DisplayMatchResults('follicle',Corr_2norm,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', 2-norm']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', 2-norm']);
 DisplayMatchResults('follicle',Corr_Infnorm,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', Inf-norm']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', Inf-norm']);
 DisplayMatchResults('follicle',Corr_Percent,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', % Difference']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', % Difference']);
 DisplayMatchResults('follicle',Corr_LMNN,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', LMNN']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', LMNN']);
 DisplayMatchResults('follicle',Corr_DEEPsc,i,'Patches',Patches_Follicle,...
-    'Vertices',Vertices_Follicle,'title',['Cell ' num2str(i) ', DEEPsc']);
+    'Vertices',Vertices_Follicle,'title',['Simulated cell ' num2str(i) ', DEEPsc']);
 
 %% Load scRNA-seq and compute predictive reproducibility
 load([pwd() '/scRNAseq/Follicle.mat'])
+
 % train new DEEPsc ensembles first
-[DEEPscPredRepNets1,indices]=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4);
-DEEPscPredRepNets2=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
-DEEPscPredRepNets3=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
+[DEEPscPredRepNets1,indices]=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4, ...
+    'PCAdims',6,'iterations',iterations,'useParallel',true,'showPlot',false);
+DEEPscPredRepNets2=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices, ...
+    'PCAdims',6,'iterations',iterations,'useParallel',true,'showPlot',false);
+DEEPscPredRepNets3=TrainDEEPscPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices, ...
+    'PCAdims',6,'iterations',iterations,'useParallel',true,'showPlot',false);
 
 % train new LMNN metrics also
 LMNNPredRep=TrainLMNNPredRep(Atlas_FollicleContinuous,'numFolds',4,'foldIndices',indices);
@@ -91,13 +94,21 @@ predReps(8,:) = CalculatePredictiveReproducibility('lmnn',Atlas_FollicleContinuo
 
 % for DEEPsc, average over three results
 temp = CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
-    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets1);
+    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets1, ...
+    'doPCA',true,'PCAdims',6);
 temp = temp+CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
-    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets2);
+    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets2, ...
+    'doPCA',true,'PCAdims',6);
 temp = temp+CalculatePredictiveReproducibility('deepsc',Atlas_FollicleContinuous, ...
-    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets3);
+    SCD_Follicle_lognormalized,'numFolds',4,'foldIndices',indices,'NNs',DEEPscPredRepNets3, ...
+    'doPCA',true,'PCAdims',6);
 predReps(9,:) = temp/3;
 
+%% Display results
+array2table(stats,...
+    'RowNames',{'Achim','Seurat','DistMap','Peng','2-norm','Inf-norm','%diff','LMNN','DEEPsc'},...
+    'VariableNames',{'accuracy','precision','robustness','performance'})
+                                                                        
 array2table(predReps,...
     'RowNames',{'Achim','Seurat','DistMap','Peng','2-norm','Inf-norm','%diff','LMNN','DEEPsc'},...
     'VariableNames',{'R_scd_zero','R_scd_nonzero','R_atlas_zero','R_atlas_nonzero'})
