@@ -181,13 +181,13 @@ for k=1:numFolds
     
     % reconstruct entire atlas with Corr, but only save this fold's genes
     C = Corr{k};
-    C = C./sum(C);      % normalize over cells
+    C = C./(sum(C)+eps());      % normalize over cells
     tmp = C'*SCD;
     predictedVals_Atlas(:,foldIndices{k}) = tmp(:,foldIndices{k});
     
     % same as above but now recontruct SCD
     C = Corr{k};
-    C = C./sum(C,2);    % normalize over positions
+    C = C./(sum(C,2)+eps());    % normalize over positions
     tmp = C*Atlas;
     predictedVals_SCD(:,foldIndices{k}) = tmp(:,foldIndices{k});
 end

@@ -7,7 +7,7 @@ switch method
     case 'log'
         % log transform
         NormSCD=log(SCD+1);
-    case 'logscale'
+    case {'logscale', 'loglinear'}
         % first do log transform, then scale linearly
         NormSCD=log(SCD+1)./(max(log(SCD+1))+eps());
 end
